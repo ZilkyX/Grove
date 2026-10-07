@@ -35,7 +35,6 @@ const productSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
-
     isFeatured: {
       type: Boolean,
       default: false,
