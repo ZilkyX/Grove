@@ -1,6 +1,8 @@
+import crypto from "crypto";
 import { AppError } from "../utils/app-error.js";
 import Coupon from "../models/coupon.model.js";
 import Order from "../models/order.model.js";
+import Product from "../models/product.model.js";
 import { stripe } from "../config/stripe.js";
 
 export const createCheckoutSession = async (req, res, next) => {
@@ -11,22 +13,40 @@ export const createCheckoutSession = async (req, res, next) => {
       throw new AppError("Invalid or empty products array", 400);
     }
 
+    const productIds = products.map((product) => product._id);
+    const dbProducts = await Product.find({ _id: { $in: productIds } });
+    const dbProductsById = new Map(
+      dbProducts.map((product) => [product._id.toString(), product]),
+    );
+
     let totalAmount = 0;
 
     const lineItems = products.map((product) => {
-      const amount = Math.round(product.price * 100);
-      totalAmount += amount * product.quantity;
+      const dbProduct = dbProductsById.get(String(product._id));
+
+      if (!dbProduct) {
+        throw new AppError(`Product not found: ${product._id}`, 400);
+      }
+
+      const quantity = Number(product.quantity);
+
+      if (!Number.isInteger(quantity) || quantity <= 0) {
+        throw new AppError(`Invalid quantity for product: ${product._id}`, 400);
+      }
+
+      const amount = Math.round(dbProduct.price * 100);
+      totalAmount += amount * quantity;
 
       return {
         price_data: {
           currency: "usd",
           product_data: {
-            name: product.name,
-            images: [product.image],
+            name: dbProduct.name,
+            images: [dbProduct.image],
           },
           unit_amount: amount,
         },
-        quantity: product.quantity,
+        quantity,
       };
     });
 
@@ -50,7 +70,6 @@ export const createCheckoutSession = async (req, res, next) => {
     }
 
     const session = await stripe.checkout.sessions.create({
-      payment_method_types: ["card"],
       line_items: lineItems,
       mode: "payment",
       success_url: `${process.env.CLIENT_URL}/success?session_id={CHECKOUT_SESSION_ID}`,
@@ -62,11 +81,15 @@ export const createCheckoutSession = async (req, res, next) => {
         userId: req.user._id.toString(),
         couponCode: couponCode || "",
         products: JSON.stringify(
-          products.map((product) => ({
-            id: product._id,
-            quantity: product.quantity,
-            price: product.price,
-          })),
+          products.map((product) => {
+            const dbProduct = dbProductsById.get(String(product._id));
+
+            return {
+              id: dbProduct._id.toString(),
+              quantity: Number(product.quantity),
+              price: dbProduct.price,
+            };
+          }),
         ),
       },
     });
@@ -84,7 +107,7 @@ export const createCheckoutSession = async (req, res, next) => {
 
 const createNewCoupon = async (userId) => {
   const newCoupon = new Coupon({
-    code: "GIFT" + Math.random().toString(36).substring(2, 8).toUpperCase(),
+    code: "GIFT" + crypto.randomBytes(4).toString("hex").toUpperCase(),
     discountPercentage: 10,
     expirationDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
     userId: userId,
@@ -127,7 +150,7 @@ export const checkoutSuccess = async (req, res, next) => {
         user: session.metadata.userId,
 
         products: products.map((product) => ({
-          product: product._id,
+          product: product.id,
           quantity: product.quantity,
           price: product.price,
         })),
@@ -148,6 +171,11 @@ export const checkoutSuccess = async (req, res, next) => {
         message:
           "Payment successful, order created, and coupon deactivated if used.",
         orderId: newOrder._id,
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        message: `Payment not completed (status: ${session.payment_status}).`,
       });
     }
   } catch (error) {

@@ -5,9 +5,21 @@ import cloudinary from "../config/cloudinary.js";
 
 export const getProducts = async (req, res, next) => {
   try {
-    const products = await Product.find({});
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
+    const skip = (page - 1) * limit;
 
-    res.json(products);
+    const [products, total] = await Promise.all([
+      Product.find({}).skip(skip).limit(limit),
+      Product.countDocuments(),
+    ]);
+
+    res.json({
+      products,
+      page,
+      totalPages: Math.ceil(total / limit),
+      totalProducts: total,
+    });
   } catch (error) {
     console.log("Error in getProducts controller", error);
     next(error);
@@ -126,9 +138,21 @@ export const getRecommendedProducts = async (req, res, next) => {
 
 export const getProductByCategory = async (req, res, next) => {
   try {
-    const products = await Product.find({ category: req.params.category });
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
+    const skip = (page - 1) * limit;
 
-    res.json(products);
+    const [products, total] = await Promise.all([
+      Product.find({ category: req.params.category }).skip(skip).limit(limit),
+      Product.countDocuments({ category: req.params.category }),
+    ]);
+
+    res.json({
+      products,
+      page,
+      totalPages: Math.ceil(total / limit),
+      totalProducts: total,
+    });
   } catch (error) {
     console.log("Error in getProductByCategory controller", error);
     next(error);

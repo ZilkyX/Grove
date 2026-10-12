@@ -36,13 +36,9 @@ export const protectRoute = async (req, res, next) => {
 };
 
 export const adminRoute = (req, res, next) => {
-  try {
-    if (req.user && req.user.role === "admin") {
-      next();
-    } else {
-      throw new AppError("Access denied - Admin only", 403);
-    }
-  } catch (error) {
-    console.error("Error in adminRoute middleware:", error);
+  if (req.user && req.user.role === "admin") {
+    next();
+  } else {
+    next(new AppError("Access denied - Admin only", 403));
   }
 };

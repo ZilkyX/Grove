@@ -22,13 +22,13 @@ export const addToCart = async (req, res, next) => {
     const user = req.user;
 
     const existingProduct = user.cartItems.find(
-      (item) => item._id === productId,
+      (item) => item.product.toString() === productId,
     );
 
     if (existingProduct) {
       existingProduct.quantity += 1;
     } else {
-      user.cartItems.push(productId);
+      user.cartItems.push({ product: productId, quantity: 1 });
     }
 
     await user.save();
@@ -63,7 +63,7 @@ export const removeFromCart = async (req, res, next) => {
     const { productId } = req.body;
     const user = req.user;
 
-    user.cartItems.pull(productId);
+    user.cartItems.pull({ product: productId });
 
     await user.save();
 
@@ -80,7 +80,9 @@ export const updateQuantity = async (req, res, next) => {
     const { quantity } = req.body;
     const user = req.user;
 
-    const existingProduct = user.cartItems.find((item) => item._id === id);
+    const existingProduct = user.cartItems.find(
+      (item) => item.product.toString() === id,
+    );
 
     if (!existingProduct) {
       throw new AppError("Item not found in the cart.", 404);

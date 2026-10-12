@@ -12,7 +12,7 @@ export const getAnalyticsData = async () => {
         $group: {
           _id: null,
           totalSales: { $sum: 1 },
-          totalRevenue: { $sum: "totalAmount" },
+          totalRevenue: { $sum: "$totalAmount" },
         },
       },
     ]);
@@ -30,7 +30,7 @@ export const getAnalyticsData = async () => {
     };
   } catch (error) {
     console.log("Error in getAnalyticsData controller", error);
-    next(error);
+    throw error;
   }
 };
 
@@ -47,9 +47,9 @@ export const getDailySalesData = async (startDate, endDate) => {
       },
       {
         $group: {
-          $dateToString: { format: "%Y-%m-%d", date: "$createdAt" },
+          _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
           sales: { $sum: 1 },
-          revenue: { $sum: "totalAmount" },
+          revenue: { $sum: "$totalAmount" },
         },
       },
       { $sort: { _id: 1 } },

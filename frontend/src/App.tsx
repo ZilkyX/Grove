@@ -1,10 +1,16 @@
-import { Button } from "./components/ui/button";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { RouterProvider } from "react-router-dom";
+import { queryClient } from "@/lib/query-client";
+import { AuthProvider } from "@/components/auth-provider";
+import { router } from "@/router";
 
 const App = () => {
   return (
-    <div>
-      <Button>Click Me!</Button>
-    </div>
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <RouterProvider router={router} />
+      </AuthProvider>
+    </QueryClientProvider>
   );
 };
 
