@@ -70,6 +70,9 @@ export function useLogout() {
     },
     onSuccess: () => {
       setUser(null);
+      // Clear everything so the next user on this tab (if any) never sees
+      // this user's cached cart/orders/admin data before it refetches.
+      queryClient.clear();
       queryClient.setQueryData(AUTH_PROFILE_QUERY_KEY, null);
     },
   });

@@ -41,54 +41,60 @@ export function LoginPage() {
       : undefined;
 
   return (
-    <div className="mx-auto max-w-sm">
-      <Card>
-        <CardHeader>
-          <CardTitle>Log in</CardTitle>
-          <CardDescription>Welcome back to Grove.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                required
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-              />
-            </div>
+    <div className="flex min-h-[70vh] items-center justify-center">
+      <div className="w-full max-w-sm">
+        <Card>
+          <CardHeader>
+            <CardTitle>Log in</CardTitle>
+            <CardDescription>Welcome back to Grove.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  autoComplete="email"
+                  required
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                />
+              </div>
 
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                required
-                minLength={6}
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-              />
-            </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="password">Password</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  autoComplete="current-password"
+                  required
+                  minLength={6}
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                />
+              </div>
 
-            {errorMessage ? (
-              <p className="text-sm text-destructive">{errorMessage}</p>
-            ) : null}
+              {errorMessage ? (
+                <p role="alert" className="text-sm text-destructive">
+                  {errorMessage}
+                </p>
+              ) : null}
 
-            <Button type="submit" disabled={login.isPending} className="mt-2">
-              {login.isPending ? "Logging in..." : "Log in"}
-            </Button>
-          </form>
+              <Button type="submit" disabled={login.isPending} className="mt-2">
+                {login.isPending ? "Logging in..." : "Log in"}
+              </Button>
+            </form>
 
-          <p className="mt-6 text-sm text-muted-foreground">
-            Don't have an account?{" "}
-            <Link to="/signup" className="text-foreground underline underline-offset-4">
-              Sign up
-            </Link>
-          </p>
-        </CardContent>
-      </Card>
+            <p className="mt-6 text-sm text-muted-foreground">
+              Don't have an account?{" "}
+              <Link to="/signup" className="text-foreground underline underline-offset-4">
+                Sign up
+              </Link>
+            </p>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

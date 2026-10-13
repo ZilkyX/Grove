@@ -3,15 +3,41 @@ import { redis } from "../config/redis.js";
 import { AppError } from "../utils/app-error.js";
 import cloudinary from "../config/cloudinary.js";
 
+const SORT_OPTIONS = {
+  newest: { createdAt: -1 },
+  "price-asc": { price: 1 },
+  "price-desc": { price: -1 },
+};
+
+const buildProductFilter = (query) => {
+  const filter = {};
+
+  if (query.category) {
+    filter.category = query.category;
+  }
+
+  if (query.search) {
+    filter.name = { $regex: String(query.search).trim(), $options: "i" };
+  }
+
+  return filter;
+};
+
+const getPagination = (query) => {
+  const page = Math.max(1, parseInt(query.page, 10) || 1);
+  const limit = Math.min(100, Math.max(1, parseInt(query.limit, 10) || 20));
+  return { page, limit, skip: (page - 1) * limit };
+};
+
 export const getProducts = async (req, res, next) => {
   try {
-    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
-    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
-    const skip = (page - 1) * limit;
+    const { page, limit, skip } = getPagination(req.query);
+    const filter = buildProductFilter(req.query);
+    const sort = SORT_OPTIONS[req.query.sort] ?? SORT_OPTIONS.newest;
 
     const [products, total] = await Promise.all([
-      Product.find({}).skip(skip).limit(limit),
-      Product.countDocuments(),
+      Product.find(filter).sort(sort).skip(skip).limit(limit),
+      Product.countDocuments(filter),
     ]);
 
     res.json({
@@ -26,20 +52,56 @@ export const getProducts = async (req, res, next) => {
   }
 };
 
+export const browseProducts = async (req, res, next) => {
+  try {
+    const { page, limit, skip } = getPagination(req.query);
+    const filter = buildProductFilter(req.query);
+    const sort = SORT_OPTIONS[req.query.sort] ?? SORT_OPTIONS.newest;
+
+    const [products, total, categories] = await Promise.all([
+      Product.find(filter)
+        .select("name description price image category isFeatured")
+        .sort(sort)
+        .skip(skip)
+        .limit(limit),
+      Product.countDocuments(filter),
+      Product.distinct("category"),
+    ]);
+
+    res.json({
+      products,
+      page,
+      totalPages: Math.ceil(total / limit),
+      totalProducts: total,
+      categories: categories.sort(),
+    });
+  } catch (error) {
+    console.log("Error in browseProducts controller", error);
+    next(error);
+  }
+};
+
 export const createProduct = async (req, res, next) => {
   try {
-    const { name, description, price, image, category } = req.body;
+    const { name, description, price, image, category, isFeatured } =
+      req.body;
 
     if (!image) {
       throw new AppError("Product image is required.", 400);
     }
 
-    let cloudinaryResponse = null;
+    let cloudinaryResponse;
 
-    if (image) {
+    try {
       cloudinaryResponse = await cloudinary.uploader.upload(image, {
         folder: "products",
       });
+    } catch (uploadError) {
+      console.log("Error uploading product image to Cloudinary", uploadError);
+      throw new AppError(
+        "Couldn't upload the product image. Please try again.",
+        502,
+      );
     }
 
     const product = await Product.create({
@@ -49,6 +111,7 @@ export const createProduct = async (req, res, next) => {
       image: cloudinaryResponse.secure_url,
       imagePublicId: cloudinaryResponse.public_id,
       category,
+      isFeatured,
     });
 
     res.status(201).json({
@@ -73,12 +136,16 @@ export const deleteProduct = async (req, res, next) => {
     if (product.imagePublicId) {
       try {
         await cloudinary.uploader.destroy(product.imagePublicId);
-      } catch (error) {
-        throw error;
+      } catch (destroyError) {
+        console.log(
+          "Error deleting product image from Cloudinary (continuing with DB deletion)",
+          destroyError,
+        );
       }
     }
 
     await Product.findByIdAndDelete(req.params.id);
+    await redis.del("featured_products");
 
     res
       .status(200)
@@ -94,7 +161,7 @@ export const getFeaturedProducts = async (req, res, next) => {
     let featureProducts = await redis.get("featured_products");
 
     if (featureProducts) {
-      return res.json(JSON.parse(featureProducts));
+      return res.json(featureProducts);
     }
 
     featureProducts = await Product.find({ isFeatured: true }).lean();
@@ -103,7 +170,7 @@ export const getFeaturedProducts = async (req, res, next) => {
       throw new AppError("No featured products found.", 404);
     }
 
-    await redis.set("featured_products", JSON.stringify(featureProducts), {
+    await redis.set("featured_products", featureProducts, {
       ex: 3600,
     });
 
@@ -189,9 +256,19 @@ export const updateProduct = async (req, res, next) => {
     }
 
     if (image) {
-      const cloudinaryResponse = await cloudinary.uploader.upload(image, {
-        folder: "products",
-      });
+      let cloudinaryResponse;
+
+      try {
+        cloudinaryResponse = await cloudinary.uploader.upload(image, {
+          folder: "products",
+        });
+      } catch (uploadError) {
+        console.log("Error uploading product image to Cloudinary", uploadError);
+        throw new AppError(
+          "Couldn't upload the product image. Please try again.",
+          502,
+        );
+      }
 
       if (product.imagePublicId) {
         await cloudinary.uploader.destroy(product.imagePublicId);

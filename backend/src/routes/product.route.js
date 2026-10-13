@@ -8,6 +8,7 @@ import {
 import {
   createProduct,
   getProducts,
+  browseProducts,
   getFeaturedProducts,
   deleteProduct,
   getRecommendedProducts,
@@ -19,8 +20,15 @@ import {
 
 const router = Router();
 
-router.post("/", protectRoute, adminRoute, validator(productSchema), createProduct);
+router.post(
+  "/",
+  protectRoute,
+  adminRoute,
+  validator(productSchema),
+  createProduct,
+);
 router.get("/", protectRoute, adminRoute, getProducts);
+router.get("/browse", browseProducts);
 router.post("/featured", getFeaturedProducts);
 router.get("/recommended", getRecommendedProducts);
 router.get("/category/:category", getProductByCategory);

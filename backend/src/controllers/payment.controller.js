@@ -98,7 +98,11 @@ export const createCheckoutSession = async (req, res, next) => {
       await createNewCoupon(req.user._id);
     }
 
-    res.status(200).json({ id: session.id, totalAmount: totalAmount / 100 });
+    res.status(200).json({
+      id: session.id,
+      url: session.url,
+      totalAmount: totalAmount / 100,
+    });
   } catch (error) {
     console.log("Error in createCheckoutSession", error);
     next(error);
